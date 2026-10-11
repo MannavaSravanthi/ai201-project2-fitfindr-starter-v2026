@@ -63,7 +63,7 @@ FitFindr turns a plain language thrifting request into a styled, shareable pick.
 - **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
   `description` (str), `size` (str or None. no size filter when omitted), `max_price` (float)
 - **Returns:**
-  A list of dicts, one per matching listing, each with `id`,`title`, `price`, `size`, `platform`
+  A list of dicts, one per matching listing, each matching listing’s full dict (all fields from data/listings.json)
 - **When it has nothing:**
   An empty list (`[]`)
 
@@ -72,7 +72,7 @@ FitFindr turns a plain language thrifting request into a styled, shareable pick.
 - **What it does:**
   Takes a new item (the listing `search_listings` found) and the user's wardrobe, and asks the model for outfit ideas that pair the new item with pieces already   in the wardrobe.
 - **Inputs:**
-  `new_item` (dict — a listing dict with fields like `title`,`category`, `colors`, `style_tags`), `wardrobe` (dict with an `items` list of wardrobe item dicts, as defined in `wardrobe_schema.json`)
+  `new_item` (dict, a listing dict with fields like `title`,`category`, `colors`, `style_tags`), `wardrobe` (dict with an `items` list of wardrobe item dicts, as defined in `wardrobe_schema.json`)
 - **Returns:**
   A list of strings, each one a distinct outfit idea describing how to style the new item with specific wardrobe pieces.
 - **When it has nothing:**
@@ -81,8 +81,7 @@ FitFindr turns a plain language thrifting request into a styled, shareable pick.
 ### `create_fit_card`
 
 - **What it does:**
-  Takes a new item and its outfit ideas, and asks the model to write a short caption describing the fit that something a user
-  could actually post alongside the listing.
+  Takes a new item and its outfit ideas, and asks the model to write a short caption describing the fit, something a user could actually post.
 - **Inputs:**
   outfit (list of strings the outfit ideas from suggest_outfit), new_item (dict the listing dict, same shape search_listings returns)
 - **Returns:**

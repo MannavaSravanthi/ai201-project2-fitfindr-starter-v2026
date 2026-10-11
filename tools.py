@@ -23,6 +23,7 @@ the description has to say what is *in* the list.
 import config  # noqa: F401 — you'll use this in search_listings
 from generate import generate
 from utils.data_loader import load_listings
+import re
 
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
@@ -79,7 +80,46 @@ def search_listings(
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
     # TODO: replace this with your implementation
-    return []
+    listings = load_listings()
+
+    size_words = {
+        "small": "s", "s": "s",
+        "medium": "m", "m": "m",
+        "large": "l", "l": "l",
+        "extra large": "xl", "xl": "xl", "xxl": "xxl",
+    }
+
+    def size_tokens(raw: str) -> list[str]:
+        # "S/M" -> ["s", "m"], "XL (oversized)" -> ["xl", "oversized"]
+        raw = re.sub(r"[()]", " ", raw.lower())
+        return re.split(r"[\s/]+", raw.strip())
+
+    target_size = None
+    if size:
+        normalized = size.strip().lower()
+        target_size = size_words.get(normalized, normalized)
+
+    query_words = set(description.lower().split())
+
+    scored = []
+    for listing in listings:
+        if max_price is not None and listing["price"] > max_price:
+            continue
+
+        if target_size is not None:
+            if target_size not in size_tokens(listing.get("size", "")):
+                continue
+
+        haystack = set(listing.get("title", "").lower().split())
+        haystack |= set(listing.get("description", "").lower().split())
+        for tag in listing.get("style_tags", []):
+            haystack |= set(tag.lower().split())
+        score = len(query_words & haystack)
+        if score > 0:
+            scored.append((score, listing))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [listing for _, listing in scored[: config.SEARCH_RESULT_LIMIT]]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
