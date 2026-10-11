@@ -40,8 +40,7 @@
 ## What This Does
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr turns a plain language thrifting request into a styled, shareable pick. A user describes what they want for example, “find me a large size vintage shirt under $20 and give me ideas to style it” and the agent searches secondhand listings for a match, builds outfit ideas by pairing the item with pieces from the user’s own wardrobe, and writes a short caption describing the fit. It also compares the item's price against similar listings to flag whether it's a good deal. Instead of searching, comparing, and imagining the outfit themselves, the user gets back a specific listing, a styling suggestion, and text they could actually post.
 
 ---
 
@@ -60,23 +59,47 @@
 ### `search_listings`
 
 - **What it does:**
+  Searches the listings data for items matching a free text description, a size, and a maximum price, and returns the ones that match.
 - **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
+  `description` (str), `size` (str or None. no size filter when omitted), `max_price` (float)
 - **Returns:**
+  A list of dicts, one per matching listing, each with `id`,`title`, `price`, `size`, `platform`
 - **When it has nothing:**
+  An empty list (`[]`)
 
 ### `suggest_outfit`
 
 - **What it does:**
+  Takes a new item (the listing `search_listings` found) and the user's wardrobe, and asks the model for outfit ideas that pair the new item with pieces already   in the wardrobe.
 - **Inputs:**
+  `new_item` (dict — a listing dict with fields like `title`,`category`, `colors`, `style_tags`), `wardrobe` (dict with an `items` list of wardrobe item dicts, as defined in `wardrobe_schema.json`)
 - **Returns:**
+  A list of strings, each one a distinct outfit idea describing how to style the new item with specific wardrobe pieces.
 - **When it has nothing:**
+  If the wardrobe's `items` list is empty, it still returns general styling advice for the new item alone, instead of failing or returning an empty list.
 
 ### `create_fit_card`
 
 - **What it does:**
+  Takes a new item and its outfit ideas, and asks the model to write a short caption describing the fit that something a user
+  could actually post alongside the listing.
 - **Inputs:**
+  outfit (list of strings the outfit ideas from suggest_outfit), new_item (dict the listing dict, same shape search_listings returns)
 - **Returns:**
+  A string. The caption text
 - **When it has nothing:**
+  If `outfit` is an empty list, it writes a caption from `new_item`'s own details alone (no styling mentioned), instead of failing.
+
+### `compare_price` (stretch)
+
+- **What it does:** Compares a listing's price against other listings that share both its category and at least one style tag, and says whether
+  it's a good deal relative to similar items.
+- **Inputs:** `item` (dict, the listing to compare)
+- **Returns:** A dict with `average_price` (float, average of the matching comparison listings), `this_price` (float, the item's own
+  price), `compared_against` (int, how many listings it was compared to), and `verdict` (str, "below average", "above average", or "about
+  average", using a small tolerance band, e.g. within 10% counts as "about average")
+- **When it has nothing:** If fewer than 2 other listings share both the category and a style tag, returns `verdict: "not enough data to
+  compare"` and the other fields as `None`, instead of computing an average from 0 or 1 items.
 
 ---
 
