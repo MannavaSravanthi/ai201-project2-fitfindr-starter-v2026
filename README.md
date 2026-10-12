@@ -83,11 +83,11 @@ FitFindr turns a plain language thrifting request into a styled, shareable pick.
 - **What it does:**
   Takes a new item and its outfit ideas, and asks the model to write a short caption describing the fit, something a user could actually post.
 - **Inputs:**
-  outfit (list of strings the outfit ideas from suggest_outfit), new_item (dict the listing dict, same shape search_listings returns)
+  outfit (string, the outfit ideas from suggest_outfit), new_item (dict the listing dict, same shape search_listings returns)
 - **Returns:**
   A string. The caption text
 - **When it has nothing:**
-  If `outfit` is an empty list, it writes a caption from `new_item`'s own details alone (no styling mentioned), instead of failing.
+  If `outfit` is an empty or whitespace only string, it writes a caption from `new_item`'s own details alone (no styling mentioned), instead of failing.
 
 ### `compare_price` (stretch)
 

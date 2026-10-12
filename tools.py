@@ -229,4 +229,99 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
     """
     # TODO: replace this with your implementation
-    return ""
+    outfit = (outfit or "").strip()
+
+    item_description = (
+        f"{new_item.get('title', 'this item')} — {new_item.get('description', '')} "
+        f"(${new_item.get('price', '?')}, via {new_item.get('platform', 'a secondhand platform')})"
+    )
+
+    system = (
+        "You write short, casual captions for secondhand fashion finds — the "
+        "kind someone would post about their own outfit. Natural and "
+        "specific, not a product description."
+    )
+
+    if not outfit:
+        prompt = (
+            f"Write a short 2-4 sentence caption about finding this item, "
+            f"without describing how to style it (no styling info is "
+            f"available yet):\n{item_description}\n\n"
+            "Mention the price and the platform naturally."
+        )
+    else:
+        prompt = (
+            f"Write a short 2-4 sentence caption someone would post about "
+            f"this find and how they're styling it.\n\n"
+            f"Item: {item_description}\n\n"
+            f"Styling idea: {outfit}\n\n"
+            "Mention the price and platform naturally, and reference the "
+            "styling idea."
+        )
+
+    return generate(prompt, system=system)
+
+# ── Tool 4: compare_price (stretch) ──────────────────────────────────────────
+
+def compare_price(item: dict) -> dict:
+    """
+    Compare a listing's price against other listings sharing its category and
+    at least one style tag, and say whether it's a good deal.
+
+    Args:
+        item: a listing dict — the item to evaluate.
+
+    Returns:
+        A dict with:
+            average_price:    float — average price of the comparison group,
+                               or None if there wasn't enough data.
+            this_price:       float — the item's own price.
+            compared_against: int — how many listings it was compared to.
+            verdict:          str — "below average", "above average",
+                               "about average" (within 10% of the average),
+                               or "not enough data to compare".
+
+    When fewer than 2 other listings share both the category and a style
+    tag, returns verdict="not enough data to compare" with average_price
+    as None, instead of computing an average from 0 or 1 items.
+    """
+    listings = load_listings()
+    item_category = item.get("category")
+    item_tags = {tag.lower() for tag in item.get("style_tags", [])}
+    this_price = item.get("price")
+
+    comparable_prices = []
+    for listing in listings:
+        if listing.get("id") == item.get("id"):
+            continue  # don't compare the item against itself
+        if listing.get("category") != item_category:
+            continue
+        listing_tags = {tag.lower() for tag in listing.get("style_tags", [])}
+        if not (item_tags & listing_tags):
+            continue
+        comparable_prices.append(listing["price"])
+
+    if len(comparable_prices) < 2:
+        return {
+            "average_price": None,
+            "this_price": this_price,
+            "compared_against": len(comparable_prices),
+            "verdict": "not enough data to compare",
+        }
+
+    average_price = sum(comparable_prices) / len(comparable_prices)
+    diff_ratio = (this_price - average_price) / average_price
+
+    if diff_ratio < -0.10:
+        verdict = "below average"
+    elif diff_ratio > 0.10:
+        verdict = "above average"
+    else:
+        verdict = "about average"
+
+    return {
+        "average_price": average_price,
+        "this_price": this_price,
+        "compared_against": len(comparable_prices),
+        "verdict": verdict,
+    }
