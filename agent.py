@@ -15,7 +15,8 @@ Build and test your three tools in `tools.py` first. Then come here.
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+import re
+from tools import search_listings, suggest_outfit, create_fit_card, compare_price
 from generate import ModelUnavailable
 
 
@@ -43,11 +44,55 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "wardrobe": wardrobe,        # the user's wardrobe
         "outfit_suggestion": None,   # what suggest_outfit returned
         "fit_card": None,            # what create_fit_card returned
+        "price_comparison": None,    # what compare_price returned
         "error": None,               # set when the run ended early
     }
 
 
 # ── planning loop ─────────────────────────────────────────────────────────────
+
+_SIZE_WORDS = {
+    "small": "small", "s": "small",
+    "medium": "medium", "m": "medium",
+    "large": "large", "l": "large",
+    "extra large": "extra large", "xl": "extra large",
+    "xxl": "xxl",
+}
+
+_FILLER_WORDS = {
+    "find", "me", "a", "an", "the", "for", "under", "size", "sized",
+    "and", "give", "ideas", "to", "style", "it", "looking", "with",
+    "please", "want", "show",
+}
+
+
+def parse_query(query: str) -> dict:
+    """
+    Pull description/size/max_price out of a plain-language query.
+    Regex/string-splitting, not a model call — see README Planning Loop.
+    """
+    working = query.lower()
+
+    max_price = None
+    price_match = re.search(r"\$\s*(\d+(?:\.\d+)?)", working)
+    if price_match:
+        max_price = float(price_match.group(1))
+        working = working.replace(price_match.group(0), " ")
+
+    size = None
+    for word in sorted(_SIZE_WORDS, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(word)}\b", working):
+            size = word
+            working = re.sub(rf"\b{re.escape(word)}\b", " ", working, count=1)
+            break
+
+    words = [w for w in re.findall(r"[a-z]+", working) if w not in _FILLER_WORDS]
+
+    return {
+        "description": " ".join(words),
+        "size": size,
+        "max_price": max_price,
+    }
 
 def run_agent(query: str, wardrobe: dict) -> dict:
     """
@@ -107,8 +152,37 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    trace.check_iterations(1)
+
+    parsed = parse_query(query)
+    session["parsed"] = parsed
+
+    results = search_listings(
+        description=parsed["description"],
+        size=parsed["size"],
+        max_price=parsed["max_price"],
+    )
+    session["search_results"] = results
+
+    if not results:
+        pieces = [f"'{parsed['description']}'"]
+        if parsed["size"]:
+            pieces.append(f"size {parsed['size']}")
+        if parsed["max_price"] is not None:
+            pieces.append(f"under ${parsed['max_price']:.0f}")
+        session["error"] = (
+            f"No listings matched {', '.join(pieces)}. Try a broader "
+            f"description, a different size, or a higher price limit."
+        )
+        return session
+
+    selected = results[0]
+    session["selected_item"] = selected
+    session["price_comparison"] = compare_price(selected)
+
+    session["outfit_suggestion"] = suggest_outfit(selected, wardrobe)
+    session["fit_card"] = create_fit_card(session["outfit_suggestion"], selected)
+
     return session
 
 
@@ -124,6 +198,7 @@ def _show(session: dict) -> None:
     print(f"  found:    {item.get('title')} — ${item.get('price')} on {item.get('platform')}")
     print(f"  outfit:   {session['outfit_suggestion']}")
     print(f"  fit card: {session['fit_card']}")
+    print(f"  price comparison: {session['price_comparison']}")
 
 
 if __name__ == "__main__":
