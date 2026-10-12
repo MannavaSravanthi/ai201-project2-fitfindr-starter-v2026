@@ -74,7 +74,7 @@ FitFindr turns a plain language thrifting request into a styled, shareable pick.
 - **Inputs:**
   `new_item` (dict, a listing dict with fields like `title`,`category`, `colors`, `style_tags`), `wardrobe` (dict with an `items` list of wardrobe item dicts, as defined in `wardrobe_schema.json`)
 - **Returns:**
-  A list of strings, each one a distinct outfit idea describing how to style the new item with specific wardrobe pieces.
+  A string containing one or two outfit ideas in prose, describing how to style the new item with specific wardrobe pieces.
 - **When it has nothing:**
   If the wardrobe's `items` list is empty, it still returns general styling advice for the new item alone, instead of failing or returning an empty list.
 

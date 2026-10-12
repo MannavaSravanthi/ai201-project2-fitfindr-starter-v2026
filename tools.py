@@ -153,7 +153,43 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
         python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
     """
     # TODO: replace this with your implementation
-    return ""
+    items = wardrobe.get("items", [])
+
+    item_description = (
+        f"{new_item.get('title', 'this item')} — {new_item.get('description', '')} "
+        f"(category: {new_item.get('category', 'unknown')}, "
+        f"colors: {', '.join(new_item.get('colors', [])) or 'unknown'}, "
+        f"style: {', '.join(new_item.get('style_tags', [])) or 'unknown'})"
+    )
+
+    system = (
+        "You are a casual styling assistant for secondhand fashion finds. "
+        "Give specific, concrete outfit suggestions, not generic advice."
+    )
+
+    if not items:
+        prompt = (
+            f"A user is considering this thrifted item:\n{item_description}\n\n"
+            "They don't have any other wardrobe items on file yet. Suggest one "
+            "or two general outfit ideas for how to style this piece on its "
+            "own or with commonly-owned basics."
+        )
+    else:
+        wardrobe_lines = "\n".join(
+            f"- {w.get('name')} ({w.get('category')}, "
+            f"colors: {', '.join(w.get('colors', [])) or 'unknown'}, "
+            f"style: {', '.join(w.get('style_tags', [])) or 'unknown'})"
+            for w in items
+        )
+        prompt = (
+            f"A user is considering this thrifted item:\n{item_description}\n\n"
+            f"Here is their existing wardrobe:\n{wardrobe_lines}\n\n"
+            "Suggest one or two outfit ideas that pair the new item with "
+            "specific pieces from their wardrobe above, naming the pieces by "
+            "name."
+        )
+
+    return generate(prompt, system=system)
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
