@@ -261,29 +261,101 @@ Score these vintage Levi's 501s on Depop for just $38 and I am never taking them
 
 ## Run Log — Before
 
-<!-- Five criteria, five tries each, in this exact format.
-
-     Five, because your criteria are written out of five. Mark each try PASS
-     or FAIL, count the passes, and read that count against your target — a
-     row targeting 4 of 5 with three PASS cells is MISSED (3/5).
-
-     `python run_eval.py --label before` runs everything and writes the table
-     into results/. Paste it here and fill in the verdicts. -->
+- Produced by: `run_eval.py::main` → `run_once` → `agent.py::run_agent`
+- Tries per scenario: 5, caching off (`config.CACHE_ENABLED = False`)
+- When: 2026-10-13 22:25
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The same item reaches every tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. The fit card mentions the price and the style | 4 of 5 | FAIL | PASS | FAIL | PASS | PASS | MISSED (3/5) |
+| 5. Results respect the price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+**Real output, one try per criterion**, from `agent.py::run_agent` via `run_eval.py::run_once`:
+
+**Criterion 1 — Try 1** (query: `vintage graphic tee under $30`, example wardrobe)
 
 ```
+selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+search_results: 10
+
+Fit card:
+Scored this little butterfly tee on Depop for $18 and I'm obsessed. Runs a little small, but it's the exact 2000s fit I wanted. Going to lean into the Bratz energy today with baggy dark denim and an unzipped hoodie, but tomorrow I'm definitely pairing it with my wide-leg khakis.
+
+Trace:
+[1] search_listings (via MCP)  → 10 items
+[2] compare_price               → dict with keys: average_price, this_price, compared_against, verdict
+[3] suggest_outfit              → two outfit ideas
+[4] create_fit_card             → fit card above
+```
+
+**Criterion 2 — Try 1** (query: `designer ballgown size XXS under $5`, example wardrobe)
 
 ```
+stopped early: yes — No listings matched 'designer ballgown xxs', under $5. Try a broader description, a different size, or a higher price limit.
+selected_item: (none)
+search_results: 0
+
+Trace:
+[1] search_listings (via MCP)
+      out: [] (empty)
+[2] branch: search_results
+      →    empty — stopping before suggest_outfit. No listings matched 'designer ballgown xxs', under $5. Try a broader description, a different size, or a higher price limit.
+```
+
+**Criterion 3 — Try 1** (query: `90s track jacket in size M`, example wardrobe)
+
+```
+selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+search_results: 9
+
+Fit card:
+Snagged this authentic 90s navy track jacket on Poshmark for $45 and I'm obsessed. I've been living for the half-zip look over a white tank and baggy dark wash jeans for easy off-duty days, but it also looks so good layered over a grey crewneck with khaki trousers. Total vintage score.
+```
+
+In `agent.py::run_agent`, `selected = results[0]` is assigned to `session["selected_item"]`
+and that exact same `selected` object is the second argument to
+`create_fit_card(session["outfit_suggestion"], selected)` — same Python
+object, not a copy, so the id passed to `create_fit_card` and the id in
+`session["selected_item"]` can never diverge. All 5 tries completed with a
+non-null `selected_item` and a fit card, confirming no exception or edge
+case broke that invariant.
+
+**Criterion 4 — Try 1** (query: `vintage graphic tee under $30`, example wardrobe) — a MISS
+
+```
+selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+style_tags: ['y2k', 'vintage', 'graphic tee', 'cottagecore']
+
+Fit card:
+Scored this little butterfly baby tee on Depop for just $18 and I am obsessed. It runs a bit small, but it's the ultimate fitted crop. I'm leaning into total Bratz doll energy today with baggy dark-wash jeans and a zip hoodie, but honestly, it looks just as good dressed down with khaki trousers.
+```
+
+The price ($18) is there, but none of `y2k`, `vintage`, `graphic tee`, or
+`cottagecore` appear anywhere in the card — "Bratz doll energy" describes a
+vibe, not the item's actual style tags. Try 3 missed the same way. Full
+diagnosis under Verdicts and Diagnoses below.
+
+**Criterion 5 — Try 1** (query: `denim jacket under $50`, example wardrobe)
+
+```
+search_results (6 items, all with price in parentheses):
+  Denim Jacket — Light Wash, Cropped ($42.0)
+  Vintage Levi's 501 Jeans — Medium Wash ($38.0)
+  90s Track Jacket — Navy/White Stripe ($45.0)
+  High-Waisted Denim Shorts — Cutoff ($24.0)
+  Straight Leg Black Jeans — Faded ($30.0)
+  Denim Vest — Medium Wash, Studded ($27.0)
+```
+
+All 6 are at or under $50. Verified against `tools.py::search_listings`,
+where the filter is `if max_price is not None and listing["price"] > max_price: continue`
+— a strict greater-than comparison, so the ceiling is inclusive, exactly as
+documented. The same 6 items, in the same order, appeared in every one of
+the 5 tries — expected, since `search_listings` doesn't call the model and
+has nothing to vary between runs.
 
 ---
 

@@ -35,18 +35,32 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Criterion 3 — the id selected_item is given has to be the same id
+        # create_fit_card is called with. A normal matching query is enough;
+        # what's being checked is what ends up in the session, not the query.
+        "name": "same item reaches every tool",
+        "query": "90s track jacket in size M",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4 — the fit card has to mention the price and a style tag.
+        # Depends on the model's phrasing, so this is exactly the one that
+        # legitimately varies try to try.
+        "name": "fit card mentions price and style",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5 — every result has to respect the price ceiling. A query
+        # that returns several listings makes this easy to check by eye.
+        "name": "results respect the price ceiling",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
