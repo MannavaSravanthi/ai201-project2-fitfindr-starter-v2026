@@ -164,6 +164,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "max_price": parsed["max_price"],
     })
     session["search_results"] = results
+    trace.step("search_listings (via MCP)", inputs=parsed, returned=results)
 
     if not results:
         pieces = [f"'{parsed['description']}'"]
@@ -175,14 +176,42 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             f"No listings matched {', '.join(pieces)}. Try a broader "
             f"description, a different size, or a higher price limit."
         )
+        trace.step(
+            "branch: search_results",
+            note=f"empty — stopping before suggest_outfit. {session['error']}",
+        )
         return session
 
     selected = results[0]
     session["selected_item"] = selected
     session["price_comparison"] = compare_price(selected)
+    trace.step(
+        "compare_price",
+        inputs={"item": selected.get("title")},
+        returned=session["price_comparison"],
+    )
 
-    session["outfit_suggestion"] = suggest_outfit(selected, wardrobe)
-    session["fit_card"] = create_fit_card(session["outfit_suggestion"], selected)
+    try:
+        session["outfit_suggestion"] = suggest_outfit(selected, wardrobe)
+        trace.step(
+            "suggest_outfit",
+            inputs={
+                "item": selected.get("title"),
+                "wardrobe_items": len(wardrobe.get("items", [])),
+            },
+            returned=session["outfit_suggestion"],
+        )
+
+        session["fit_card"] = create_fit_card(session["outfit_suggestion"], selected)
+        trace.step(
+            "create_fit_card",
+            inputs={"outfit": session["outfit_suggestion"], "item": selected.get("title")},
+            returned=session["fit_card"],
+        )
+    except ModelUnavailable as exc:
+        session["error"] = str(exc)
+        trace.step("model call", note=f"ModelUnavailable — stopping. {exc}")
+        return session
 
     return session
 

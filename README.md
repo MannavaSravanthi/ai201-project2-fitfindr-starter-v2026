@@ -241,13 +241,13 @@ Score these vintage Levi's 501s on Depop for just $38 and I am never taking them
 - *What I asked for:* A way to pull `description`/`size`/`max_price` out of
   the raw query string without burning a model call on every request, since
   an extra call per query is expensive.
-- *What came back:* Regex and string splitting — pull the price out with a
+- *What came back:* Regex and string splitting pull the price out with a
   `$` regex, match size words against a lookup table, treat whatever words
   are left (minus fillers like "find", "me", "under") as the description.
 - *What changed:* The first version checked size words in plain dict order,
   so a query like "extra large tee" matched "large" first, cut just that
   out, and left `size: "large"` instead of `"extra large"`. I changed
-  `_SIZE_WORDS` to be checked longest-word-first
+  `_SIZE_WORDS` to be checked longest word first
   (`sorted(_SIZE_WORDS, key=len, reverse=True)` in `parse_query` in
   `agent.py`), so "extra large" gets matched and removed before "large" can
   grab a piece of it.
@@ -321,32 +321,90 @@ that produced it:
 
 ## Loop Trace
 
-<!-- One full run, printed step by step, with the MCP call visible in it.
-
-     `python app.py ask '...' --trace` once you've added the trace.step()
-     calls in Milestone 2.
-
-     Worth pasting BOTH the happy path and the empty-search path. The empty
-     one should be visibly shorter, because it stops. If your two traces are
-     the same length, your branch isn't working — and this is the fastest way
-     anyone will ever find that out. -->
-
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[2] compare_price
+      in:  dict with keys: item
+      out: dict with keys: average_price, this_price, compared_against, verdict
+[3] suggest_outfit
+      in:  dict with keys: item, wardrobe_items
+      out: Here are two specific ways to style your new Y2K butterfly baby tee using pieces you already own:  **Outfit 1:…
+[4] create_fit_card
+      in:  dict with keys: outfit, item
+      out: Scored this little butterfly tee on Depop for just $18 and I'm obsessed. Squeezed into the medium (definitely…
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Here are two specific ways to style your new Y2K butterfly baby tee using pieces you already own:
+
+**Outfit 1: Bratz Doll Streetwear**
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Black cropped zip hoodie (wear it unzipped or slung off the shoulders)
+*   **Shoes:** Chunky white sneakers
+*   **Bag:** Black crossbody bag
+*   *Why it works:* The fitted crop of the baby tee balances out the baggy, low-slung look of the dark wash jeans. Layering the cropped zip hoodie on top keeps the Y2K silhouette going, and the chunky sneakers tie the whole streetwear vibe together.
+
+**Outfit 2: Soft Contrast Grunge**
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt
+*   *Why it works:* This plays with the mix of cottagecore and Y2K by adding some edge. Tuck the baby tee into the khaki trousers and cinch them with the brown leather belt. Throwing the black denim jacket and combat boots on gives the sweet butterfly graphic a cool, grunge-inspired contrast.
+
+  Fit card: Scored this little butterfly tee on Depop for just $18 and I'm obsessed. Squeezed into the medium (definitely runs like a small), but it's worth it. Today I'm leaning all the way into the Bratz doll aesthetic with dark baggy denim and my chunkiest sneakers.
+
+2 model calls this session, 774 prompt + 356 output tokens
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5'
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[2] branch: search_results
+      →    empty — stopping before suggest_outfit. No listings matched 'designer ballgown xxs', under $5. Try a broader description, a different size, or a higher price limit.
 
+  No listings matched 'designer ballgown xxs', under $5. Try a broader description, a different size, or a higher price limit.
+
+0 model calls this session
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+The empty-search trace is 2 steps against the happy path's 4 — the branch stops before `suggest_outfit` and `create_fit_card` ever run, exactly as the Planning Loop branch rule says it should.
+
+**Failure modes triggered (Milestone 2)**
+
+- **Empty search** — `python app.py ask 'designer ballgown size XXS under $5'`. Trace above. Stops at step 2 with a message naming what to change (broader description, different size, higher price).
+- **Empty wardrobe** — `python app.py ask 'denim jacket under $50' --empty-wardrobe`. `suggest_outfit` still returned two full outfit ideas built from "basic staples you probably already have," not a crash and not an empty string — the `if not items:` branch in `tools.py` already handled this correctly from Unit 3.
+- **Model unavailable** — broke one character of `GEMINI_API_KEY` in `.env`, then ran a fresh query (`python app.py ask 'platform sneakers size 8'`):
+  ```
+  [3] model call
+        →    ModelUnavailable — stopping. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+
+    The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+
+  1 model calls this session
+  ```
+  Before this unit, that exception had no handler in `run_agent()` — it would propagate up and get caught generically by `app.py`'s top-level handler, printing the raw exception with no guidance. Now `run_agent()` catches `ModelUnavailable` directly (`agent.py`, around the `suggest_outfit`/`create_fit_card` calls), sets `session["error"]` to the message `generate.py` already builds, and stops cleanly — same shape as the empty-search branch. Key restored afterward.
+
+**On the MCP move:** `search_listings` is registered in `mcp_server.py` with a full
+description (units, types, empty case) and typed inputs matching the Tool
+Inventory. `run_agent()` in `agent.py` now calls it via
+`mcp_client.call_tool("search_listings", {...})` instead of importing and
+calling the function directly. Verified with `python mcp_client.py` (the tool
+lists correctly) and with full queries end to end — the return shape didn't
+change: still a list of listing dicts, best match first, empty list when
+nothing matches. The only visible difference is a small added latency, since
+`call_tool` starts a fresh server subprocess over stdio for every call rather
+than holding one open — noticeable but not disruptive for a single-query CLI.
 
 
 
