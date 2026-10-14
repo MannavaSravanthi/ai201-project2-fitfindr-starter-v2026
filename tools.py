@@ -231,9 +231,23 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     # TODO: replace this with your implementation
     outfit = (outfit or "").strip()
 
+    # Unit 4, Milestone 5 — the improvement. Criterion 4 missed 3/5 because
+    # this prompt never told the model the item's actual style_tags, so it
+    # reached for its own vibe words ("Bratz doll energy") instead of a real
+    # tag. Now the tags are in item_description AND the prompt explicitly
+    # asks for one of the exact words.
+    style_tags = new_item.get("style_tags") or []
+
     item_description = (
         f"{new_item.get('title', 'this item')} — {new_item.get('description', '')} "
-        f"(${new_item.get('price', '?')}, via {new_item.get('platform', 'a secondhand platform')})"
+        f"(${new_item.get('price', '?')}, via {new_item.get('platform', 'a secondhand platform')}, "
+        f"style: {', '.join(style_tags) if style_tags else 'unspecified'})"
+    )
+
+    style_instruction = (
+        f"Work in one of these exact style words, naturally: {', '.join(style_tags)}."
+        if style_tags
+        else "No style tags are available for this item, so skip that."
     )
 
     system = (
@@ -247,7 +261,7 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
             f"Write a short 2-4 sentence caption about finding this item, "
             f"without describing how to style it (no styling info is "
             f"available yet):\n{item_description}\n\n"
-            "Mention the price and the platform naturally."
+            f"Mention the price and the platform naturally. {style_instruction}"
         )
     else:
         prompt = (
@@ -255,8 +269,8 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
             f"this find and how they're styling it.\n\n"
             f"Item: {item_description}\n\n"
             f"Styling idea: {outfit}\n\n"
-            "Mention the price and platform naturally, and reference the "
-            "styling idea."
+            f"Mention the price and platform naturally, and reference the "
+            f"styling idea. {style_instruction}"
         )
 
     return generate(prompt, system=system)

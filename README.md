@@ -361,33 +361,19 @@ has nothing to vary between runs.
 
 ## Verdicts and Diagnoses
 
-<!-- MET or MISSED per criterion against LAST UNIT's target, plus a sentence on
-     how you decided.
-
-     Then, for every miss: which of the four places it happened — a tool, the
-     loop's branch, the session, or the model's output — AND the mechanism.
-
-     Not a diagnosis:  "The fit card was bad."
-     A diagnosis:      "The fit card criterion missed on 2 of 5 items. Both had
-                        an empty brand field. My prompt puts the brand in the
-                        first sentence, so the card opened with a blank and read
-                        like a fragment. The tool worked; the prompt assumed a
-                        field that isn't always there."
-
-     Look for a pattern. Three misses on the same tool is one problem, not
-     three. -->
-
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | A matching query completes all three tools | 4 of 5 | **MET (5/5)** | All 5 tries had `session["error"]` unset and a non-empty `fit_card`. 5 ≥ 4, so the target holds comfortably. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | **MET (5/5)** | All 5 tries had `search_results == []`, `session["error"]` set, and the trace shows only `search_listings` and the branch step — `suggest_outfit` never appears. 5 of 5. |
+| 3 | The same item reaches every tool | 5 of 5 | **MET (5/5)** | `agent.py::run_agent` assigns `selected = results[0]` once, stores it as `session["selected_item"]`, and passes that same object into `create_fit_card(session["outfit_suggestion"], selected)`. Same Python object, not a copy — the two ids can't diverge by construction. All 5 tries completed with a non-null `selected_item`, confirming nothing broke that invariant. |
+| 4 | The fit card mentions the price and the style | 4 of 5 | **MISSED (3/5)** | Checked each of the 5 fit cards against the item's real `style_tags` (`y2k`, `vintage`, `graphic tee`, `cottagecore`). Price was mentioned in all 5. The style tag was mentioned in only 3 of 5 — the other 2 described a vibe ("Bratz doll energy", "grunge it up") instead of using an actual tag word. 3 < 4, so this misses the target. |
+| 5 | Results respect the price ceiling | 5 of 5 | **MET (5/5)** | All 6 results from the `denim jacket under $50` scenario — $42, $38, $45, $24, $30, $27 — are at or under $50, in every one of the 5 tries (deterministic, no model involved, so no variance was expected). |
 
 **Diagnoses**
 
+**Criterion 4 missed — model output, not a tool bug.** `create_fit_card`'s prompt (in `tools.py`) tells the model: "Mention the price and platform naturally, and reference the styling idea" — it never asks the model to use the item's actual `style_tags`. The model only sees the item's `title` and `description` plus whatever `suggest_outfit` generated, so it reaches for a vibe word of its own ("Bratz doll energy," "grunge it up") rather than the literal tag words (`y2k`, `vintage`, `graphic tee`, `cottagecore`) it was never told to use. `search_listings`, `compare_price`, and the branch logic all worked correctly on every try — the gap is specifically in what the `create_fit_card` prompt asks for, which is exactly the kind of thing criteria.md predicted for this criterion: "depends on the model's phrasing rather than just code logic."
 
+**No pattern across tools.** This is the only miss, and it's isolated to one tool's prompt, not spread across multiple tools or the loop's branching — so there's one fix to make here, not several. Everything deterministic (the branch, the price filter, the object identity between `selected_item` and `create_fit_card`) passed 5/5 every time, as criteria.md predicted it should.
 
 ---
 
@@ -489,9 +475,20 @@ than holding one open — noticeable but not disruptive for a single-query CLI.
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** Rewrote `create_fit_card`'s prompt in `tools.py`. Two
+things: (1) `item_description` now includes the item's actual `style_tags`
+(`style: y2k, vintage, graphic tee, cottagecore`) — before, the model never
+even saw them, only `title`/`description`/`price`/`platform`. (2) Added an
+explicit instruction, `style_instruction`, telling the model to "work in one
+of these exact style words, naturally." Nothing else in `create_fit_card`,
+`suggest_outfit`, `search_listings`, or the loop changed.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Criterion 4 — "the fit card mentions
+the price and the style" — missed 3/5 in the before-run. The diagnosis
+(Verdicts and Diagnoses, above) found the misses weren't random: the model
+reached for its own vibe words ("Bratz doll energy") instead of a real style
+tag, because the prompt never gave it the tags or asked for one. This change
+targets exactly that gap.
 
 ### Run Log — After
 
