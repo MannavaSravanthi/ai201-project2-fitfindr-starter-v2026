@@ -261,10 +261,6 @@ Score these vintage Levi's 501s on Depop for just $38 and I am never taking them
 
 ## Run Log — Before
 
-- Produced by: `run_eval.py::main` → `run_once` → `agent.py::run_agent`
-- Tries per scenario: 5, caching off (`config.CACHE_ENABLED = False`)
-- When: 2026-10-13 22:25
-
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
 | 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
@@ -334,7 +330,7 @@ Scored this little butterfly baby tee on Depop for just $18 and I am obsessed. I
 ```
 
 The price ($18) is there, but none of `y2k`, `vintage`, `graphic tee`, or
-`cottagecore` appear anywhere in the card — "Bratz doll energy" describes a
+`cottagecore` appear anywhere in the card "Bratz doll energy" describes a
 vibe, not the item's actual style tags. Try 3 missed the same way. Full
 diagnosis under Verdicts and Diagnoses below.
 
@@ -354,7 +350,7 @@ All 6 are at or under $50. Verified against `tools.py::search_listings`,
 where the filter is `if max_price is not None and listing["price"] > max_price: continue`
 — a strict greater-than comparison, so the ceiling is inclusive, exactly as
 documented. The same 6 items, in the same order, appeared in every one of
-the 5 tries — expected, since `search_listings` doesn't call the model and
+the 5 tries expected, since `search_listings` doesn't call the model and
 has nothing to vary between runs.
 
 ---
@@ -494,18 +490,27 @@ targets exactly that gap.
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. The same item reaches every tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. The fit card mentions the price and the style | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Results respect the price ceiling | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+**Criterion 4 — Try 1** (query: `vintage graphic tee under $30`, example wardrobe) — now a PASS
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+```
+selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+style_tags: ['y2k', 'vintage', 'graphic tee', 'cottagecore']
 
+Fit card:
+Scored this sweet little y2k butterfly baby tee on Depop for just 18 bucks. It runs a bit small, but it's the ultimate cropped fit. I've been living in it with my baggy jeans and a zip hoodie, but I'm dying to try it with wide-leg trousers and combat boots next.
+```
 
+Compare that to the same scenario's before-run Try 1, which produced "Bratz doll energy" instead of a real tag — this try (and all 5 in this run) names an actual `style_tags` word (`y2k`) directly, plus the price. I checked all 5 after-run fit cards against the item's real `style_tags` the same way I checked the before-run ones: every one of the 5 now says `y2k` explicitly (one also adds `graphic tee`), and every one mentions the price. 5/5, up from 3/5.
+
+Criteria 1, 2, 3, and 5 didn't move — their logic (the branch, the price filter, the `selected_item` object identity) lives in code the fix never touched, and the after-run confirms that: same 5/5 results as the before-run, just re-verified on a fresh run.
+
+**Did it help, and how do I know:** Yes. Criterion 4 went from MISSED (3/5) to MET (5/5), and I know because I read all 5 after-run fit cards against the item's actual `style_tags` the same way I diagnosed the miss — not by assuming the prompt change worked. Nothing regressed: criteria 1, 2, 3, and 5 are still 5/5, which is expected since the fix only changed `create_fit_card`'s prompt and nothing in `search_listings`, the branch logic, or the `selected_item` plumbing.
 
 ---
 
