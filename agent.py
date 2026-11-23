@@ -67,6 +67,60 @@ _FILLER_WORDS = {
 }
 
 
+# ── capstone: off-topic check ─────────────────────────────────────────────────
+#
+# A query has to name a clothing item to reach search. Only ITEM words are in
+# here — never colours (black), styles (vintage) or fabrics (denim, linen),
+# because those are exactly the words that let "recommend a black coffee" and
+# "vintage car under $30" match a listing by accident.
+#
+# Built from the five categories in data/listings.json (tops, bottoms,
+# outerwear, shoes, accessories) plus common items the data doesn't have yet.
+
+_CLOTHING_WORDS = {
+    # tops
+    "tee", "shirt", "top", "blouse", "sweater", "sweatshirt", "hoodie",
+    "cardigan", "crewneck", "henley", "polo", "tank", "camisole", "vest",
+    "jersey", "kurta",
+    # bottoms
+    "jeans", "jean", "pants", "pant", "trousers", "shorts", "skirt",
+    "leggings", "joggers", "cargos",
+    # dresses
+    "dress", "gown", "jumpsuit", "romper", "saree", "sari", "lehenga",
+    # outerwear
+    "jacket", "coat", "blazer", "windbreaker", "bomber", "shacket", "parka",
+    "puffer", "trench",
+    # shoes
+    "shoe", "sneaker", "boot", "sandal", "heel", "loafer", "flat", "jane",
+    # accessories
+    "belt", "hat", "cap", "bag", "scarf", "bandana", "beanie", "purse",
+}
+
+OFF_TOPIC_MESSAGE = (
+    "FitFindr only helps find secondhand clothing, and I couldn't find a "
+    "clothing item in that. Try naming the piece you want, like "
+    "'vintage graphic tee under $30'."
+)
+
+
+def is_clothing_query(query: str) -> bool:
+    """
+    True if the query names at least one clothing item from _CLOTHING_WORDS.
+
+    Plurals: a word also counts if dropping a trailing "s" or "es" gives a
+    word in the list, so "shirts" -> "shirt" and "dresses" -> "dress".
+    """
+    for word in re.findall(r"[a-z]+", query.lower()):
+        forms = {word}
+        if word.endswith("es"):
+            forms.add(word[:-2])
+        if word.endswith("s"):
+            forms.add(word[:-1])
+        if forms & _CLOTHING_WORDS:
+            return True
+    return False
+
+
 def parse_query(query: str) -> dict:
     """
     Pull description/size/max_price out of a plain-language query.
