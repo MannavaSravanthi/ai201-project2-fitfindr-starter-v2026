@@ -112,3 +112,29 @@ reason to expect it to pass inconsistently.
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+---
+
+## Capstone criteria
+
+Test set: `capstone_queries.py` (10 on_topic, 10 off_topic, labelled before any code was written).
+
+**1. Off-topic queries are rejected.**
+Of the 10 queries labelled `off_topic` in `capstone_queries.py`, at least 8 are rejected — `session["error"]` is set and `search_listings` is never called — in each of the 3 trials.
+Why 8: two of the off-topic queries, "how do I wash a denim jacket" and "what's the history of the sneaker", contain clothing words, so a clothing word list will likely let them through. Letting an off-topic query through costs 2 model calls and shows the user an unrelated fit card, which is less bad than rejecting a real clothing request.
+
+**2. Real clothing queries get through.**
+Of the 10 queries labelled `on_topic` in `capstone_queries.py`, at least 9 pass the check and reach `search_listings`, in each of the 3 trials.
+Why 9: "something to wear for an Indian wedding" is a real clothing request with no clothing word in it, so a clothing word list may reject it. Every other on-topic query names a clothing item and should pass. This target is stricter than criterion 1's because rejecting a real clothing request is the worse mistake: the user asked for something FitFindr can do, is told it can't help, and leaves.
+
+**3. A rejection costs nothing.**
+Every query rejected as off-topic makes 0 model calls and 0 calls to `search_listings`, in each of the 3 trials.
+Why 0 and 0: FitFindr runs on the free tier, which allows 15 model requests a minute. If unrelated queries use up calls, there may be none left for real clothing queries. Search is skipped too, because each MCP search call starts a new server process, which takes time even though it costs no quota. A word-list check doesn't need either tool, so there's no reason to allow even one call.
+
+**4. The rejection message says why, and what to try instead.**
+Every rejection message contains the word "clothing" and one example query in quotes, and is different from the "No listings matched…" message, in each of the 3 trials.
+Why: a user whose real clothing request gets rejected (like "something to wear for an Indian wedding", which has no clothing word) believes they asked a correct question. If the message only says nothing matched, they'll think FitFindr failed. Saying FitFindr helps with clothing and showing an example query tells them how to ask again so it gets through. The "No listings matched… try a broader description" message would point them the wrong way.
+
+**5. The normal path still works.**
+Every `on_topic` query that passes the check (and gets search results) still ends with `session["error"]` as None and a fit card of at least 150 characters, in each of the 3 trials.
+Why 150: a fit card is meant to be 2–4 sentences that mention the item's price and platform. Two short sentences with both come to about 150 characters, and my Project 2 fit cards were 240–350. Anything under 150 means the model's answer was cut short or nearly empty, which is a broken result even though the run didn't crash. Why every passing query: this is the only criterion that involves the model, so it's the one that can differ between trials, and the off-topic check must not break any request it lets through.
