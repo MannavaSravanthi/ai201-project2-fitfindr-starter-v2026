@@ -559,3 +559,20 @@ Criteria 1, 2, 3, and 5 didn't move — their logic (the branch, the price filte
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+---
+
+## Capstone
+
+**What This Extends**
+
+FitFindr (Project 2), the thrift-shopping agent that searches listings over MCP, compares the price, suggests an outfit and writes a fit card. Right now, FitFindr assumes every query is a clothing request. A fully off-topic query like "tell me a joke" falls into the empty-search branch and is told to "try a broader description", which is the wrong advice. Worse, an off-topic query that shares one word with a listing, like "vintage car under $30" (*vintage*) or "recommend a black coffee" (*black*), goes all the way through: `search_listings` counts a single shared word as a match, so FitFindr picks a tee or a pair of shoes and spends 2 model calls writing a fit card nobody asked for. After this unit, a check against a clothing word list runs before search. Queries with no clothing word are rejected with a message that says FitFindr helps with clothing and gives an example query, with no model or search calls.
+
+**The Shape**
+
+Shape B: Harden against failure. An off-topic query is bad input that FitFindr currently doesn't survive: it either gives the user the wrong message or quietly produces a confident, irrelevant result. The extension is the check that catches that bad input before it reaches the tools.
+
+Out of scope, considered and decided against:
+- I'm not using the model to classify queries. It would handle cases a word list misses, but it would spend a model call on every query, including the ones it rejects.
+- I'm not changing how `search_listings` scores matches. Requiring more shared words would be a different fix, and it would change results for real clothing queries too.
+- I'm not hosting it. It runs locally with a committed log (Path B).
