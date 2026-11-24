@@ -13,7 +13,11 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import time
+
 import config
+import generate
+import runlog
 import trace
 import re
 from tools import suggest_outfit, create_fit_card, compare_price
@@ -47,6 +51,8 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "fit_card": None,            # what create_fit_card returned
         "price_comparison": None,    # what compare_price returned
         "error": None,               # set when the run ended early
+        "outcome": None,             # capstone: ok / off_topic / no_results / model_unavailable / crashed
+        "search_called": False,      # capstone: did search_listings run? (criteria 1 and 3)
     }
 
 
@@ -151,6 +157,45 @@ def parse_query(query: str) -> dict:
 
 def run_agent(query: str, wardrobe: dict) -> dict:
     """
+    Capstone: run the loop once and write ONE log record, whatever happened.
+
+    The planning loop itself is _run_agent below, unchanged except for the
+    off-topic check. This wrapper times it, counts the model calls it made,
+    and logs the result — including runs that crash.
+    """
+    started = time.perf_counter()
+    calls_before = generate.call_count()
+    tokens_before = generate.token_counts()
+    session = None
+    crash = None
+    try:
+        session = _run_agent(query, wardrobe)
+        return session
+    except Exception as exc:  # logged below, then re-raised unchanged
+        crash = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        tokens_after = generate.token_counts()
+        s = session or {}
+        outcome = "crashed" if crash else (s.get("outcome") or ("ok" if not s.get("error") else "error"))
+        runlog.write({
+            "query": query,
+            "outcome": outcome,
+            "error": crash or s.get("error"),
+            "search_called": s.get("search_called", False),
+            "results_count": len(s.get("search_results") or []),
+            "selected_item": (s.get("selected_item") or {}).get("title"),
+            "fit_card": s.get("fit_card"),
+            "fit_card_chars": len(s.get("fit_card") or ""),
+            "model_calls": generate.call_count() - calls_before,
+            "prompt_tokens": tokens_after["prompt"] - tokens_before["prompt"],
+            "output_tokens": tokens_after["output"] - tokens_before["output"],
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+        })
+
+
+def _run_agent(query: str, wardrobe: dict) -> dict:
+    """
     Run the loop once and return the finished session.
 
     Args:
@@ -216,6 +261,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # search call and no model calls (criterion 3).
     if not is_clothing_query(query):
         session["error"] = OFF_TOPIC_MESSAGE
+        session["outcome"] = "off_topic"
         trace.step(
             "branch: off-topic check",
             inputs={"query": query},
@@ -223,6 +269,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         )
         return session
 
+    session["search_called"] = True
     results = call_tool("search_listings", {
         "description": parsed["description"],
         "size": parsed["size"],
@@ -237,6 +284,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             pieces.append(f"size {parsed['size']}")
         if parsed["max_price"] is not None:
             pieces.append(f"under ${parsed['max_price']:.0f}")
+        session["outcome"] = "no_results"
         session["error"] = (
             f"No listings matched {', '.join(pieces)}. Try a broader "
             f"description, a different size, or a higher price limit."
@@ -275,6 +323,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         )
     except ModelUnavailable as exc:
         session["error"] = str(exc)
+        session["outcome"] = "model_unavailable"
         trace.step("model call", note=f"ModelUnavailable — stopping. {exc}")
         return session
 
