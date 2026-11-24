@@ -1,0 +1,12 @@
+{
+  "query": "vintage graphic tee under $30",
+  "successful_runs": 6,
+  "of": 10,
+  "avg_model_calls": 2.0,
+  "avg_prompt_tokens": 750.5,
+  "avg_output_tokens": 293.3,
+  "avg_total_tokens": 1043.8,
+  "avg_duration_ms": 8036.2,
+  "min_duration_ms": 2861,
+  "max_duration_ms": 22109
+}
