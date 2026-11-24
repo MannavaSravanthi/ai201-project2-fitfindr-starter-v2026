@@ -100,6 +100,9 @@ _CLOTHING_WORDS = {
     "shoe", "sneaker", "boot", "sandal", "heel", "loafer", "flat", "jane",
     # accessories
     "belt", "hat", "cap", "bag", "scarf", "bandana", "beanie", "purse",
+    # compound words — listed whole on purpose. Matching word ENDINGS instead
+    # would catch "ballgown" but also "laptop" (top) and "what" (hat).
+    "ballgown", "sweatpants", "overshirt", "tshirt", "overalls",
 }
 
 OFF_TOPIC_MESSAGE = (
