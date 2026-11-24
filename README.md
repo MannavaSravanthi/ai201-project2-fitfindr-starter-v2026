@@ -580,3 +580,148 @@ Out of scope, considered and decided against:
 **Running It**
 
 Path B: local with logs. One command starts it (`python app.py ask '...'`), and every run appends a structured record to `logs/runs.jsonl`. The steps from a clean checkout, what the environment needs, and how to read the log are in [RUNNING.md](RUNNING.md).
+
+
+**Instrumentation**
+
+Every call to `agent.py::run_agent` writes one JSON record to `logs/runs.jsonl` (or the file named in `FITFINDR_LOG`) through `runlog.py::write`. `run_agent` wraps the planning loop (`_run_agent`) and writes the record in a `finally`, so rejected, failed and crashed runs are logged too. `python runlog.py` prints the last 10.
+
+| Field | What it holds |
+|---|---|
+| `ts` | UTC timestamp, milliseconds |
+| `query` | what came in, as typed |
+| `outcome` | `ok`, `off_topic`, `no_results`, `model_unavailable` or `crashed` |
+| `error` | the message the user saw, or the exception for a crash |
+| `search_called` | whether `search_listings` ran (criteria 1–3) |
+| `results_count`, `selected_item` | what search found and what was picked |
+| `fit_card`, `fit_card_chars` | what came out, and its length (criterion 5) |
+| `model_calls`, `prompt_tokens`, `output_tokens` | what the run spent, from `generate.py`'s own counters |
+| `duration_ms` | end-to-end time for the run |
+
+All 20 records from trial 2 of the before run (`logs/capstone_before_trial2.jsonl`). They include rejected runs (`off_topic`), an empty search (`no_results`), and failed runs (`model_unavailable`, Gemini 503). `fit_card` and long `error` text are shortened here to fit; the committed file has them in full.
+
+```
+{"ts": "2026-11-24T19:29:59.322+00:00", "query": "give me a plaid skirt styling ideas", "outcome": "ok", "error": null, "search_called": true, "results_count": 2, "selected_item": "Oversized Flannel Shirt — Plaid Red/Black", "fit_card": "Scored this vintage red and black flannel on thredUp for just $22 and …", "fit_card_chars": 264, "model_calls": 2, "prompt_tokens": 794, "output_tokens": 352, "duration_ms": 3037}
+{"ts": "2026-11-24T19:29:59.712+00:00", "query": "blue sweater", "outcome": "no_results", "error": "No listings matched 'blue sweater'. Try a broader description, a different size, or a higher price limit.", "search_called": true, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 388}
+{"ts": "2026-11-24T19:30:02.704+00:00", "query": "how to style black denim jeans", "outcome": "ok", "error": null, "search_called": true, "results_count": 10, "selected_item": "Straight Leg Black Jeans — Faded", "fit_card": "Scored these perfectly faded black straight-leg jeans on thredUp for j…", "fit_card_chars": 327, "model_calls": 2, "prompt_tokens": 758, "output_tokens": 335, "duration_ms": 2992}
+{"ts": "2026-11-24T19:30:04.135+00:00", "query": "brown suede jacket", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 6, "selected_item": "90s Track Jacket — Navy/White Stripe", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 1430}
+{"ts": "2026-11-24T19:30:06.387+00:00", "query": "coffee colored shirt", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 2, "selected_item": "Oversized Flannel Shirt — Plaid Red/Black", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 2251}
+{"ts": "2026-11-24T19:30:12.330+00:00", "query": "linen shirts for summer or winter?", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 10, "selected_item": "Vintage Linen Blazer — Cream", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 5941}
+{"ts": "2026-11-24T19:30:14.479+00:00", "query": "floral dresses styling ideas", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 1, "selected_item": "90s Silk Slip Dress — Floral, Midi Length", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 2148}
+{"ts": "2026-11-24T19:30:14.480+00:00", "query": "something to wear for an Indian wedding", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:16.322+00:00", "query": "light washed denim jean with boot cut", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 10, "selected_item": "Vintage Levi's 501 Jeans — Medium Wash", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 1841}
+{"ts": "2026-11-24T19:30:28.097+00:00", "query": "bandana colors that go with a light colored t shirt", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 7, "selected_item": "Vintage Polo Shirt — Forest Green", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 11775}
+{"ts": "2026-11-24T19:30:28.098+00:00", "query": "tell me a joke", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.099+00:00", "query": "cranberry cookies recipe", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.099+00:00", "query": "can you give some recipe cards for high protein meals?", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.100+00:00", "query": "give me ideas to decorate my laptop.", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.100+00:00", "query": "vintage car under $30", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.100+00:00", "query": "recommend a black coffee", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.101+00:00", "query": "Is the color of taj-mahal off white?", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:28.101+00:00", "query": "where to buy orange color snoopy coffee mug?", "outcome": "off_topic", "error": "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want…", "search_called": false, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 0}
+{"ts": "2026-11-24T19:30:30.043+00:00", "query": "how do I wash a denim jacket", "outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high…", "search_called": true, "results_count": 7, "selected_item": "Vintage Levi's 501 Jeans — Medium Wash", "fit_card": null, "fit_card_chars": 0, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 1941}
+{"ts": "2026-11-24T19:30:30.457+00:00", "query": "what's the history of the sneaker", "outcome": "no_results", "error": "No listings matched 'what history of sneaker', size s. Try a broader description, a different size, or a higher price li…", "search_called": true, "results_count": 0, "selected_item": null, "fit_card": null, "fit_card_chars": 0, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0, "duration_ms": 414}
+```
+
+A crashed run, from the after run (`logs/capstone_after_trial1.jsonl`), shortened:
+
+```
+{"query": "brown suede jacket", "outcome": "crashed", "error": "RuntimeError: Still rate limited after 5 attempts ... Last error: 503 UNAVAILABLE ...", "search_called": false, "results_count": 0, "model_calls": 5, "duration_ms": 39795}
+```
+
+**What It Costs**
+
+Measured with `python run_capstone.py --cost`: the query "vintage graphic tee under $30" (example wardrobe), 10 times, cache off. Tokens come from `generate.py`'s counters, which add up the `usage_metadata` Gemini returns on each response. Raw records are in `logs/capstone_cost.jsonl` and the averages in `results/capstone_cost.json`.
+
+Gemini was overloaded during the measurement: **6 of 10 runs succeeded**, and the other 4 got `503 UNAVAILABLE`. The averages are over the 6 that succeeded.
+
+| Measure | Per successful run (average of 6) |
+|---|---|
+| Model calls | 2.0 (suggest_outfit + create_fit_card) |
+| Tokens | 750.5 prompt + 293.3 output = **1,043.8 tokens** |
+| Time | **8.0 s** average (2.9 s min, 22.1 s max) |
+
+In money it cost $0, because it runs on the Gemini free tier. I didn't convert tokens to dollars because I didn't measure a paid bill.
+
+A hundred people a day, one query each:
+- Tokens: 1,043.8 × 100 = **104,380 tokens a day**
+- Requests: 2 × 100 = **200 model requests a day**
+- Time: 8.0 s × 100 = 800 s ≈ **13.4 minutes of run time a day**
+
+The real limit is the rate, not the daily total: 15 requests a minute ÷ 2 per run ≈ 7 runs a minute. An off-topic query that's rejected costs 0 model calls and 0 search calls (criterion 3), so rejected queries don't eat into that.
+
+**Run Log and Verdicts**
+
+Five criteria from `criteria.md`, 20 labelled queries from `capstone_queries.py`, three trials (`python run_capstone.py --label before`, cache off). Scores are computed from the run logs by `run_capstone.py::score`. Every query's outcome per trial is in `results/capstone_before.md`.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Off-topic queries are rejected | ≥ 8 of 10 | 8/10 | 8/10 | 8/10 | MET |
+| 2. Real clothing queries get through | ≥ 9 of 10 | 9/10 | 9/10 | 9/10 | MET |
+| 3. A rejection costs nothing (0 model, 0 search calls) | every rejection | 9/9 | 9/9 | 9/9 | MET |
+| 4. Rejection message has 'clothing' + an example in quotes | every rejection | 9/9 | 9/9 | 9/9 | MET |
+| 5. Normal path still ends with a fit card ≥ 150 chars | every passing query with results | 8/8 | 2/8 | 2/8 | MISSED |
+
+Real output, from `logs/capstone_before_trial2.jsonl` (written by `runlog.py::write` from `agent.py::run_agent`):
+- **Criterion 1**, "vintage car under $30": `"outcome": "off_topic", "search_called": false, "model_calls": 0`
+- **Criterion 2**, "coffee colored shirt": `"search_called": true`. It passed the check even though it shares *coffee* with "recommend a black coffee", because it names *shirt*.
+- **Criterion 3**, "tell me a joke": `"model_calls": 0, "search_called": false`
+- **Criterion 4**, every rejection's `error`: "FitFindr only helps find secondhand clothing, and I couldn't find a clothing item in that. Try naming the piece you want, like 'vintage graphic tee under $30'."
+- **Criterion 5**, "brown suede jacket": `"outcome": "model_unavailable", "error": "Couldn't reach the model: 503 UNAVAILABLE ... experiencing high demand ..."`
+
+Criteria 1 and 2 came out exactly where I set them when I wrote the criteria. "something to wear for an Indian wedding" was rejected because it has no clothing word, and "how do I wash a denim jacket" and "what's the history of the sneaker" got through because they do.
+
+**Diagnosis of the miss, criterion 5 (8/8, 2/8, 2/8).** All 12 failures in trials 2 and 3 were `model_unavailable` with Gemini's 503 "high demand" error. None was a short or empty fit card: when the model answered, every card was 204–336 characters. The stage is the model call in `generate.py::generate()`. The mechanism is that `generate()` only retries errors it recognises as rate limits (429, "resource exhausted", "rate limit"). A 503 matches none of them, so it raises `ModelUnavailable` on the first try, even though Gemini's own message says the overload is usually temporary. The fit card criterion missed because of how one error type was handled, not because of the fit card.
+
+**The Improvement**
+
+What I changed: in `generate.py::generate()`, the `rate_limited` check now also matches "503" and "unavailable", so a 503 goes into the existing wait-and-retry loop (up to 5 attempts, with growing waits) instead of failing on the first try. It's two lines, aimed directly at the diagnosis above.
+
+Run Log — After (`python run_capstone.py --label after`, same five criteria, same format; detail in `results/capstone_after.md`):
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Off-topic queries are rejected | ≥ 8 of 10 | 8/10 | 8/10 | 8/10 | MET |
+| 2. Real clothing queries get through | ≥ 9 of 10 | 8/10 | 9/10 | 9/10 | MISSED |
+| 3. A rejection costs nothing (0 model, 0 search calls) | every rejection | 9/9 | 9/9 | 9/9 | MET |
+| 4. Rejection message has 'clothing' + an example in quotes | every rejection | 9/9 | 9/9 | 9/9 | MET |
+| 5. Normal path still ends with a fit card ≥ 150 chars | every passing query with results | 7/7 | 8/8 | 8/8 | MET |
+
+Did it help? For what it targeted, yes. Fit cards for queries that passed the check and found results went from **12 of 24** before (8 + 2 + 2) to **23 of 24** after. Criterion 5 now shows MET.
+
+But it made something else worse, and criterion 2 caught it. In trial 1, "brown suede jacket" hit a 503 five times in a row. After the fifth try, `generate.py` gives up by raising a `RuntimeError` ("Still rate limited after 5 attempts"), and `run_agent` only catches `ModelUnavailable`, so the run **crashed** after 39.8 s. Before my change the same 503 failed cleanly in about a second.
+
+The crash also exposed a logging bug. When a run crashes, `_run_agent` never returns its session, so the log wrapper wrote `"search_called": false` for a query that *did* reach search. My scorer reads only the log, so it counted "brown suede jacket" as rejected by the off-topic check, and criterion 2 dropped to 8/10 in trial 1. The off-topic check didn't fail; the log misreported a crash. The same artifact means trial 1's criterion 5 cell (7/7) left the crashed query out. The honest count is **7/8**, so criterion 5 isn't fully met after the change either.
+
+The trade, named:
+- **Better:** 23 of 24 passing runs now produce a fit card, instead of 12 of 24.
+- **Worse:** a run whose retries all fail now crashes after up to about 40 s instead of failing cleanly in about 1 s, and retries raised the average model calls per successful run from 2.0 to 2.6–4.2.
+
+**What's Still Broken**
+
+- **Criterion 2 (missed after the improvement), the crash on exhausted retries.** What I'd do: catch the `RuntimeError` from `generate.py` in `run_agent` alongside `ModelUnavailable`, and have the log wrapper keep the partial session on a crash so `search_called` is recorded truthfully. Why I stopped: the brief asks for one improvement, and fixing this would be a second change needing its own re-run.
+- **Criterion 1 (met at 8/10), clothing words in non-shopping questions.** "how do I wash a denim jacket" passes the check every time and, after the retry fix, gets a full fit card for a laundry question every time. A word list can't tell a clothing *question* from a clothing *request*. Fixing that needs something that understands intent, like a model classifier, which I scoped out because it costs a call on every query.
+- **Criterion 2 (met at 9/10 before), clothing requests with no clothing word.** "something to wear for an Indian wedding" is rejected in every trial. Adding *wear* and *outfit* would let it through, but would also let through things like "what to wear to an interview: tips?", which is the same problem as above.
+- **Things the log showed that my test set didn't cover:**
+  - "blue sweater" finds nothing because the listings have a sweatshirt but no sweater.
+  - "give me a plaid skirt styling ideas" picks a plaid *flannel shirt*, because search matches *plaid*, not *skirt*.
+  - The word list also accepts "jane" (for Mary Janes), "tank" and "flat", so "a Jane Austen novel" or "fish tank" would pass.
+- **Targets:** criteria 1 and 2 landed exactly on their targets, so they weren't set low. Criterion 5's 150-character bar was loose: the shortest real card in both runs was 204 characters, so I'd tighten it to 200.
+
+**What I'd do next:** the first thing would be to fix the crash path, by catching the exhausted-retry error in `run_agent` and logging the partial session. Right now a Gemini overload can still crash a run, and the log misreports it as an off-topic rejection, which makes every other number harder to trust.
+
+**How I Used AI**
+
+I used Claude throughout this unit. I made the decisions: the system, the shape, the labelled test set, and the criteria's targets and reasons. Claude helped me sharpen the criteria wording and wrote most of the code (the word list check, the run log, the test runner) and the first drafts of these README sections, which I reviewed and edited. The one code change I made myself was the 503 retry in Moment 2.
+
+**Moment 1**
+
+- *What I asked for:* My new run log showed that "designer ballgown size XXS under $5", the course's own no-results example, was being rejected as off-topic. My word list had *gown* but not *ballgown*. I asked to fix it before running any tests.
+- *What came back:* Two options. (A) Add *ballgown* and other compound words to `_CLOTHING_WORDS` explicitly. (B) Match word *endings*, so any word ending in a clothing word counts, which would also catch *sweatpants* and *overshirt* automatically.
+- *What I changed:* I went with option A. Before choosing, we ran option B against my labelled test set, and it would have let "give me ideas to decorate my laptop" through (*lap**top*** ends in *top*), and almost any question through, because *what* and *that* end in *hat*. That would have made criterion 1 worse to fix one query outside my test set. The compound words are now listed whole at the end of `_CLOTHING_WORDS` in `agent.py`, with a comment explaining why ending-matching was rejected, and the test set still scored the same (17 of 20) afterwards.
+
+**Moment 2**
+
+- *What I asked for:* My before run missed criterion 5 (8/8, 2/8, 2/8), and every failure in the log was Gemini's `503 UNAVAILABLE` "high demand" error. At first I guessed the failing stage was MCP. I asked for an explanation of where the failure actually was and why it wasn't being retried.
+- *What came back:* The trace showed `search_listings (via MCP)` succeeding with 10 items, and the failure happening at the model call after it. The explanation walked through the `except` block in `generate.py::generate()`: the `rate_limited` check only matches "429", "resource exhausted" and "rate limit", so a 503 skips the retry loop and raises `ModelUnavailable` on the first try, even though Gemini says the overload is temporary.
+- *What I changed:* I added two lines to the `rate_limited` check myself, `or "503" in message` and `or "unavailable" in message`, so a 503 goes into the existing wait-and-retry loop. Fit cards went from 12 of 24 to 23 of 24. The after run then showed the trade-off I hadn't predicted: when all 5 retries fail, `generate.py` raises a `RuntimeError` that `run_agent` doesn't catch, so "brown suede jacket" crashed, and the crash made the log record `search_called: false`. I reported that as a criterion 2 miss caused by my own improvement, instead of re-running until it passed.
