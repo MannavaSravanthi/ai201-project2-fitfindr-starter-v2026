@@ -212,6 +212,17 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     parsed = parse_query(query)
     session["parsed"] = parsed
 
+    # Capstone: reject off-topic queries before search, so they cost no MCP
+    # search call and no model calls (criterion 3).
+    if not is_clothing_query(query):
+        session["error"] = OFF_TOPIC_MESSAGE
+        trace.step(
+            "branch: off-topic check",
+            inputs={"query": query},
+            note=f"no clothing word — stopping before search_listings. {OFF_TOPIC_MESSAGE}",
+        )
+        return session
+
     results = call_tool("search_listings", {
         "description": parsed["description"],
         "size": parsed["size"],
