@@ -576,3 +576,7 @@ Out of scope, considered and decided against:
 - I'm not using the model to classify queries. It would handle cases a word list misses, but it would spend a model call on every query, including the ones it rejects.
 - I'm not changing how `search_listings` scores matches. Requiring more shared words would be a different fix, and it would change results for real clothing queries too.
 - I'm not hosting it. It runs locally with a committed log (Path B).
+
+**Running It**
+
+Path B: local with logs. One command starts it (`python app.py ask '...'`), and every run appends a structured record to `logs/runs.jsonl`. The steps from a clean checkout, what the environment needs, and how to read the log are in [RUNNING.md](RUNNING.md).

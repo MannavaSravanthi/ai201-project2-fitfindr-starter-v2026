@@ -246,3 +246,48 @@ history is what shows your criteria existed before your results did.
 units.
 
 `results/` is deliberately **not** in `.gitignore`.
+
+---
+
+## Capstone — the run path (Path B: local with logs)
+
+FitFindr runs on this machine, started by one command. Every run writes one
+structured record to `logs/runs.jsonl`; the committed files under `logs/` are
+the record of it actually running.
+
+**What the environment needs**
+
+- Python 3.11, 3.12 or 3.13 (not 3.14)
+- The pinned packages in `requirements.txt` (python-dotenv, google-genai, mcp, flask, gunicorn)
+- A Gemini API key in `.env` as `GEMINI_API_KEY` — the free tier is enough
+- No local model files: the model (`gemini-3.5-flash-lite`) is called over the API
+
+**From a clean checkout**
+
+```bash
+git clone https://github.com/MannavaSravanthi/ai201-project2-fitfindr-starter-v2026.git
+cd ai201-project2-fitfindr-starter-v2026
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env              # then paste your GEMINI_API_KEY into .env
+python app.py ask 'vintage graphic tee under $30'     # ← the start command
+```
+
+**Seeing what it did**
+
+```bash
+python runlog.py                  # prints the last 10 log records
+```
+
+Each record has: `ts`, `query`, `outcome` (ok / off_topic / no_results /
+model_unavailable / crashed), `error`, `search_called`, `results_count`,
+`selected_item`, `fit_card`, `fit_card_chars`, `model_calls`,
+`prompt_tokens`, `output_tokens`, `duration_ms`.
+
+**Trying the off-topic check**
+
+```bash
+python app.py ask 'tell me a joke' --trace          # rejected, 0 model calls
+python app.py ask 'vintage car under $30' --trace   # rejected, no search
+```
